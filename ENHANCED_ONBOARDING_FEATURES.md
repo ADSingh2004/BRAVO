@@ -99,7 +99,7 @@
 ## 📁 File Structure
 
 ```
-APP_CORE_FEATURE/project/
+Root Directory/
 ├── src/
 │   ├── components/
 │   │   └── EnhancedOnboarding.tsx (NEW - 435 lines)

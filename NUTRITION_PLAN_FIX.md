@@ -109,7 +109,7 @@ Meal Suggestions:
 ```
 
 ## Files Modified 📁
-- `/workspaces/S.H.AD2-BitShift-Hackathon-/APP_CORE_FEATURE/project/src/App.tsx`
+- `src/App.tsx`
 
 ## Testing Checklist ✅
 - [ ] Complete the Enhanced Onboarding form

@@ -267,8 +267,8 @@ eas build --platform ios
 
 ## 🔗 Related Files
 
-- Web App: `/APP_CORE_FEATURE/project/src/`
-- Database: `/APP_CORE_FEATURE/project/database/`
+- Web App: `/src/`
+- Database: `/database/`
 - RAG Model: `/RAG_MODEL/`
 
 ## 📞 Support

@@ -180,7 +180,7 @@ eas build --platform ios
 
 ## Contributing
 
-This app mirrors the functionality of the web application at `APP_CORE_FEATURE/project/`.
+This app mirrors the functionality of the web application in the root directory.
 
 ## Support
 

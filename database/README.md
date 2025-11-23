@@ -47,8 +47,8 @@ All tables have Row Level Security (RLS) enabled to ensure:
 ## 🔗 Connection
 
 Database connection is configured in:
-- `../src/lib/supabase.ts` - Supabase client
-- `../.env` - Environment variables (Supabase URL and API key)
+- `src/lib/supabase.ts` - Supabase client
+- `.env` - Environment variables (Supabase URL and API key)
 
 ## 📚 Additional Resources
 

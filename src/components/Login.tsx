@@ -55,7 +55,7 @@ export default function Login({ onLogin }: LoginProps) {
             <Sparkles className="w-[45px] h-[45px] text-white" />
           </div>
           <h1 className="text-3xl font-bold text-teal-600 mb-2">
-            {isSignUp ? 'Create Account' : 'Welcome to fitnessFREAK'}
+            {isSignUp ? 'Create Account' : 'Welcome to BRAVO'}
           </h1>
           <p className="text-gray-500 text-[15px]">Your AI-powered fitness companion</p>
         </div>

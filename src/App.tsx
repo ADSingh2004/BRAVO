@@ -232,7 +232,7 @@ export default function FitGenieApp() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [showChat, setShowChat] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { type: 'bot', text: 'Hi! I\'m your fitnessFREAK AI coach. Ask me anything about workouts, nutrition, or wellness!', verified: true }
+    { type: 'bot', text: 'Hi! I\'m your BRAVO AI coach. Ask me anything about workouts, nutrition, or wellness!', verified: true }
   ]);
   const [inputMessage, setInputMessage] = useState('');
 
@@ -393,7 +393,7 @@ export default function FitGenieApp() {
               <Sparkles className="text-white" size={24} />
             </div>
             <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-teal-600 to-emerald-500 bg-clip-text text-transparent">fitnessFREAK</h1>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-teal-600 to-emerald-500 bg-clip-text text-transparent">BRAVO</h1>
               <p className="text-xs text-gray-500">AI Fitness Coach</p>
             </div>
           </div>
@@ -458,7 +458,7 @@ export default function FitGenieApp() {
               className="flex items-center gap-2 bg-gradient-to-r from-teal-500 to-emerald-400 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-shadow"
             >
               <MessageCircle size={20} />
-              Ask fitnessFREAK
+              Ask BRAVO
             </button>
           </div>
         </div>
@@ -598,7 +598,7 @@ export default function FitGenieApp() {
             <div className="bg-gradient-to-r from-teal-500 to-emerald-400 px-8 py-6 rounded-t-3xl">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-white text-2xl font-bold">Ask fitnessFREAK AI Coach</h2>
+                  <h2 className="text-white text-2xl font-bold">Ask BRAVO AI Coach</h2>
                   <p className="text-teal-50 text-sm flex items-center gap-2 mt-1">
                     <Sparkles size={14} />
                     Powered by RAG • Safe & Verified Responses

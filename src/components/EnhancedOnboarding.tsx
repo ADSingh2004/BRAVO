@@ -130,7 +130,7 @@ export default function EnhancedOnboarding({ onComplete, userEmail }: EnhancedOn
             <Sparkles className="text-white" size={48} />
           </div>
           <h1 className="text-4xl font-bold text-gray-800 mb-2">
-            Welcome to fitnessFreak
+            Welcome to BRAVO
           </h1>
           <p className="text-gray-600">Your AI-powered fitness companion. Let's create your personalized plan!</p>
         </div>

@@ -6,6 +6,7 @@ import Login from './components/Login';
 import ProfileForm from './components/ProfileForm';
 import Settings from './components/Settings';
 import EnhancedOnboarding from './components/EnhancedOnboarding';
+import { bravoOrchestrator } from './services/orchestrator';
 
 // Types
 interface ChatMessage {
@@ -46,33 +47,6 @@ interface Profile {
   days: number;
   minutes: number;
 }
-
-// Knowledge Base for RAG
-const knowledgeBase = {
-  nutrition_substitutes: {
-    broccoli: "palak (spinach), methi (fenugreek), green beans, or gobhi (cauliflower)",
-    chicken: "paneer, tofu, fish, soya chunks, or legumes",
-    rice: "quinoa, daliya (broken wheat), ragi, or cauliflower rice",
-    milk: "toned milk, chaas (buttermilk), lassi, or soy milk",
-    protein: "whey protein, paneer, chana (chickpeas), moong dal, or masoor dal",
-    yogurt: "dahi (curd), chaas (buttermilk), lassi, or paneer",
-    indian_protein: "dal (lentils), rajma (kidney beans), chole (chickpeas), sprouts, or soya chunks",
-    indian_breakfast: "besan chilla, moong dal cheela, paneer bhurji, or masala oats",
-    indian_snacks: "roasted chana, makhana (foxnuts), mixed sprouts chat, or paneer tikka"
-  },
-  exercise_alternatives: {
-    squats: "lunges, leg press, or step-ups",
-    "push-ups": "chest press, wall push-ups, or incline push-ups",
-    running: "cycling, swimming, or brisk walking",
-    "pull-ups": "lat pulldown, assisted pull-ups, or resistance band rows"
-  },
-  safety_warnings: [
-    "⚠️ IMPORTANT: If you feel sharp pain, stop immediately.",
-    "⚠️ Chest pain requires immediate medical attention.",
-    "⚠️ Our app provides fitness guidance, not medical advice.",
-    "⚠️ Consult a doctor before starting any new exercise program."
-  ]
-};
 
 // Rules Engine for Personalized Plans
 const planGenerator = {
@@ -235,17 +209,24 @@ export default function FitGenieApp() {
     { type: 'bot', text: 'Hi! I\'m your BRAVO AI coach. Ask me anything about workouts, nutrition, or wellness!', verified: true }
   ]);
   const [inputMessage, setInputMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
   // Test database connection on mount
   useEffect(() => {
     const initializeApp = async () => {
-      console.log('🚀 Initializing FitGenie App...');
+      console.log('🚀 Initializing BRAVO App...');
       
       // Test database connection
       const dbConnected = await testDatabaseConnection();
       if (dbConnected) {
         console.log('✅ Database ready!');
       }
+      
+      // Check RAG API status
+      const isApiOnline = await bravoOrchestrator.checkHealth();
+      setApiStatus(isApiOnline ? 'online' : 'offline');
+      console.log(`🤖 BRAVO RAG API: ${isApiOnline ? 'Online' : 'Offline (using fallback)'}`);
       
       // Check if user is already logged in
       const user = await checkAuthStatus();
@@ -258,75 +239,48 @@ export default function FitGenieApp() {
     initializeApp();
   }, []);
 
-  // RAG-powered chat response generator
-  const generateRAGResponse = (userQuery: string) => {
-    const query = userQuery.toLowerCase();
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() || isLoading) return;
     
-    // Check for safety concerns first
-    if (query.includes('pain') || query.includes('hurt') || query.includes('injury')) {
-      return {
-        text: "⚠️ IMPORTANT: If you're experiencing pain, please stop exercising immediately and consult with a healthcare professional. Our app provides fitness guidance, not medical advice. Your safety is the top priority!",
-        verified: true
-      };
-    }
-    
-    // Check for nutrition substitutes
-    for (const [food, substitutes] of Object.entries(knowledgeBase.nutrition_substitutes)) {
-      if (query.includes(food)) {
-        return {
-          text: `Based on our nutrition guide, great substitutes for ${food} include: ${substitutes}. These alternatives provide similar nutritional benefits!`,
-          verified: true
-        };
-      }
-    }
-    
-    // Check for exercise alternatives
-    for (const [exercise, alternatives] of Object.entries(knowledgeBase.exercise_alternatives)) {
-      if (query.includes(exercise)) {
-        return {
-          text: `Good alternatives for ${exercise} include: ${alternatives}. These exercises target similar muscle groups and can be adjusted to your fitness level.`,
-          verified: true
-        };
-      }
-    }
-    
-    // General fitness queries
-    if (query.includes('water') || query.includes('hydrat')) {
-      return {
-        text: "Aim for 8-10 glasses of water daily, more if you're exercising intensely. Proper hydration improves performance and recovery!",
-        verified: true
-      };
-    }
-    
-    if (query.includes('rest') || query.includes('recovery')) {
-      return {
-        text: "Rest days are crucial! Your muscles grow during recovery, not during workouts. Aim for at least 1-2 rest days per week, and get 7-9 hours of sleep nightly.",
-        verified: true
-      };
-    }
-    
-    // Default helpful response
-    return {
-      text: "That's a great question! For specific medical or dietary concerns, please consult with a qualified healthcare professional. I can help with general fitness guidance, exercise alternatives, and nutrition substitutions. What would you like to know?",
-      verified: true
-    };
-  };
-
-  const handleSendMessage = () => {
-    if (!inputMessage.trim()) return;
-    
-    // Add user message
-    setChatMessages(prev => [...prev, { type: 'user', text: inputMessage }]);
-    
-    // Generate RAG response
-    const response = generateRAGResponse(inputMessage);
-    
-    // Add bot response after a short delay
-    setTimeout(() => {
-      setChatMessages(prev => [...prev, { type: 'bot', text: response.text, verified: response.verified }]);
-    }, 500);
-    
+    const userMessage = inputMessage.trim();
     setInputMessage('');
+    setIsLoading(true);
+    
+    // Add user message immediately
+    setChatMessages(prev => [...prev, { type: 'user', text: userMessage }]);
+    
+    try {
+      // Update orchestrator with user context
+      bravoOrchestrator.setUserContext({
+        goal: profile.goal,
+        fitnessLevel: profile.level,
+        name: profile.name,
+      });
+      
+      // Get response from orchestrator (RAG API or fallback)
+      const response = await bravoOrchestrator.sendMessage(userMessage);
+      
+      // Add bot response
+      setChatMessages(prev => [...prev, { 
+        type: 'bot', 
+        text: response.response, 
+        verified: response.verified ?? false 
+      }]);
+      
+      // Update API status based on response
+      const status = bravoOrchestrator.getStatus();
+      setApiStatus(status.online ? 'online' : 'offline');
+      
+    } catch (error) {
+      console.error('Error getting response:', error);
+      setChatMessages(prev => [...prev, { 
+        type: 'bot', 
+        text: 'I apologize, but I encountered an error. Please try again.', 
+        verified: false 
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleLogin = (email: string) => {
@@ -601,7 +555,7 @@ export default function FitGenieApp() {
                   <h2 className="text-white text-2xl font-bold">Ask BRAVO AI Coach</h2>
                   <p className="text-teal-50 text-sm flex items-center gap-2 mt-1">
                     <Sparkles size={14} />
-                    Powered by RAG • Safe & Verified Responses
+                    Powered by RAG • {apiStatus === 'online' ? '🟢 AI Online' : apiStatus === 'checking' ? '🟡 Connecting...' : '🟠 Fallback Mode'}
                   </p>
                 </div>
                 <button
@@ -621,16 +575,33 @@ export default function FitGenieApp() {
                       ? 'bg-gradient-to-r from-teal-500 to-emerald-400 text-white rounded-tr-none' 
                       : 'bg-gray-100 text-gray-800 rounded-tl-none'
                   }`}>
-                    <p className="text-sm">{msg.text}</p>
-                    {msg.verified && (
+                    <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                    {msg.type === 'bot' && msg.verified && (
                       <span className="text-xs text-green-600 mt-2 inline-flex items-center gap-1">
                         <CheckCircle size={12} />
                         Verified Source • RAG-Powered
                       </span>
                     )}
+                    {msg.type === 'bot' && !msg.verified && (
+                      <span className="text-xs text-orange-500 mt-2 inline-flex items-center gap-1">
+                        ⚡ General Response
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-100 rounded-2xl rounded-tl-none p-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                      <span className="text-sm text-gray-500 ml-2">BRAVO is thinking...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             
             <div className="p-6 border-t border-gray-100">
@@ -645,15 +616,17 @@ export default function FitGenieApp() {
                   placeholder="Ask about nutrition, exercises, or wellness..."
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                  className="flex-1 px-6 py-4 border-2 border-gray-200 rounded-2xl focus:outline-none focus:border-teal-500 text-sm"
+                  onKeyPress={(e) => e.key === 'Enter' && !isLoading && handleSendMessage()}
+                  disabled={isLoading}
+                  className="flex-1 px-6 py-4 border-2 border-gray-200 rounded-2xl focus:outline-none focus:border-teal-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <button 
                   onClick={handleSendMessage}
-                  className="bg-gradient-to-r from-teal-500 to-emerald-400 text-white px-8 py-4 rounded-2xl font-semibold hover:shadow-lg transition-shadow flex items-center gap-2"
+                  disabled={isLoading || !inputMessage.trim()}
+                  className="bg-gradient-to-r from-teal-500 to-emerald-400 text-white px-8 py-4 rounded-2xl font-semibold hover:shadow-lg transition-shadow flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Send size={20} />
-                  Ask
+                  {isLoading ? 'Sending...' : 'Ask'}
                 </button>
               </div>
             </div>

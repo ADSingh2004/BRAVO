@@ -1,10 +1,16 @@
 import google.generativeai as genai
 import os
+from pathlib import Path
+from dotenv import load_dotenv
 
-# Configure with API key (with fallback to hardcoded key)
-GEMINI_API_KEY = "AIzaSyDMcQeqPU7DnA-7GN7wneAwHeDEU8-blp8"
-api_key = os.environ.get("GEMINI_API_KEY", GEMINI_API_KEY)
-genai.configure(api_key=api_key)
+ROOT_DIR = Path(__file__).resolve().parents[2]
+load_dotenv(ROOT_DIR / ".env")
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+  raise EnvironmentError("GEMINI_API_KEY not set. Please update your .env file.")
+
+genai.configure(api_key=GEMINI_API_KEY)
 
 print("✅ Gemini API configured")
 print("\n📋 Available models that support generateContent:")

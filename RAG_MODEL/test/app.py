@@ -3,14 +3,18 @@ import google.generativeai as genai
 import chromadb
 import textwrap
 from pathlib import Path
+from dotenv import load_dotenv
 
 # --- Configuration ---
 # Paths relative to the test folder
+ROOT_DIR = Path(__file__).resolve().parents[2]
+load_dotenv(ROOT_DIR / ".env")
+
 DB_PATH = str(Path(__file__).parent.parent / "vector_db")
 FITNESS_COLLECTION = "fitness_knowledge"
 NUTRITION_COLLECTION = "nutrition_knowledge"
 GENERATION_MODEL = "models/gemini-2.5-flash"  # Updated to use available model
-GEMINI_API_KEY = "AIzaSyDMcQeqPU7DnA-7GN7wneAwHeDEU8-blp8"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 def initialize_models():
     """
@@ -18,9 +22,11 @@ def initialize_models():
     Loads both fitness and nutrition collections.
     """
     # 1. Setup Gemini API Key
+    # 1. Setup Gemini API Key
     try:
-        api_key = os.environ.get("GEMINI_API_KEY", GEMINI_API_KEY)
-        genai.configure(api_key=api_key)
+        if not GEMINI_API_KEY:
+            raise ValueError("GEMINI_API_KEY not set. Please update your .env file.")
+        genai.configure(api_key=GEMINI_API_KEY)
         print("✅ Gemini API key configured.")
     except Exception as e:
         print(f"❌ FATAL: Failed to configure Gemini API key: {e}")

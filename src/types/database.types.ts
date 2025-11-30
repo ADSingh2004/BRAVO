@@ -167,7 +167,7 @@ export interface Database {
           created_at?: string
         }
       }
-      nutrition_logs: {
+      nutrient_logs: {
         Row: {
           id: string
           user_id: string

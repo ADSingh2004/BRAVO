@@ -49,15 +49,15 @@ export default function Login({ onLogin }: LoginProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-600 to-emerald-500 flex items-center justify-center p-4">
-      <div className="w-full max-w-[440px] bg-white rounded-[24px] shadow-2xl p-[50px_40px] animate-slideIn">
-        <div className="text-center mb-9">
-          <div className="w-20 h-20 bg-gradient-to-br from-teal-600 to-emerald-500 rounded-[20px] flex items-center justify-center mx-auto mb-5 shadow-lg">
-            <Sparkles className="w-[45px] h-[45px] text-white" />
+      <div className="w-full max-w-[440px] bg-white rounded-2xl sm:rounded-[24px] shadow-2xl p-6 sm:p-[50px_40px] animate-slideIn">
+        <div className="text-center mb-6 sm:mb-9">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-teal-600 to-emerald-500 rounded-2xl sm:rounded-[20px] flex items-center justify-center mx-auto mb-4 sm:mb-5 shadow-lg">
+            <Sparkles className="w-9 h-9 sm:w-[45px] sm:h-[45px] text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-teal-600 mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-teal-600 mb-2">
             {isSignUp ? 'Create Account' : 'Welcome to BRAVO'}
           </h1>
-          <p className="text-gray-500 text-[15px]">Your AI-powered fitness companion</p>
+          <p className="text-gray-500 text-sm sm:text-[15px]">Your AI-powered fitness companion</p>
         </div>
 
         {error && (
@@ -73,7 +73,7 @@ export default function Login({ onLogin }: LoginProps) {
         )}
 
         <form onSubmit={handleSubmit}>
-          <div className="mb-[22px]">
+          <div className="mb-4 sm:mb-[22px]">
             <label className="block text-gray-700 text-sm font-semibold mb-2">
               Email Address
             </label>
@@ -83,11 +83,11 @@ export default function Login({ onLogin }: LoginProps) {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
-              className="w-full px-4 py-[14px] border-2 border-gray-200 rounded-xl text-[15px] transition-all focus:outline-none focus:border-teal-500 focus:shadow-[0_0_0_4px_rgba(16,185,129,0.1)]"
+              className="w-full px-4 py-3 sm:py-[14px] border-2 border-gray-200 rounded-xl text-sm sm:text-[15px] transition-all focus:outline-none focus:border-teal-500 focus:shadow-[0_0_0_4px_rgba(16,185,129,0.1)]"
             />
           </div>
 
-          <div className="mb-[22px]">
+          <div className="mb-4 sm:mb-[22px]">
             <label className="block text-gray-700 text-sm font-semibold mb-2">
               Password
             </label>
@@ -97,7 +97,7 @@ export default function Login({ onLogin }: LoginProps) {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
               required
-              className="w-full px-4 py-[14px] border-2 border-gray-200 rounded-xl text-[15px] transition-all focus:outline-none focus:border-teal-500 focus:shadow-[0_0_0_4px_rgba(16,185,129,0.1)]"
+              className="w-full px-4 py-3 sm:py-[14px] border-2 border-gray-200 rounded-xl text-sm sm:text-[15px] transition-all focus:outline-none focus:border-teal-500 focus:shadow-[0_0_0_4px_rgba(16,185,129,0.1)]"
             />
             <div className="text-right mt-2">
               <a href="#forgot" className="text-teal-500 text-sm font-medium hover:text-teal-600">
@@ -126,12 +126,12 @@ export default function Login({ onLogin }: LoginProps) {
           </button>
         </form>
 
-        <div className="flex items-center my-8 text-gray-400 text-sm before:content-[''] before:flex-1 before:h-[1px] before:bg-gray-200 after:content-[''] after:flex-1 after:h-[1px] after:bg-gray-200">
-          <span className="px-4">or continue with</span>
+        <div className="flex items-center my-6 sm:my-8 text-gray-400 text-xs sm:text-sm before:content-[''] before:flex-1 before:h-[1px] before:bg-gray-200 after:content-[''] after:flex-1 after:h-[1px] after:bg-gray-200">
+          <span className="px-3 sm:px-4">or continue with</span>
         </div>
 
-        <div className="flex gap-4 mb-6">
-          <button className="flex-1 py-3 px-4 border-2 border-gray-200 rounded-xl bg-white transition-all hover:border-teal-500 hover:bg-teal-50 flex items-center justify-center gap-2 text-sm font-medium text-gray-700">
+        <div className="flex gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <button className="flex-1 py-2.5 sm:py-3 px-3 sm:px-4 border-2 border-gray-200 rounded-xl bg-white transition-all hover:border-teal-500 hover:bg-teal-50 flex items-center justify-center gap-2 text-xs sm:text-sm font-medium text-gray-700">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>

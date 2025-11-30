@@ -26,7 +26,7 @@ export async function testDatabaseConnection() {
       'exercises', 
       'workout_entries',
       'workout_logs',
-      'nutrition_logs',
+      'nutrient_logs',
       'user_progress',
       'user_goals'
     ];

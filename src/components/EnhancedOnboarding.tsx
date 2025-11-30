@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Sparkles, User, Calendar, Users, Ruler, Weight, Target, Home, Dumbbell, TreePine, Heart, AlertCircle, Utensils, ArrowRight } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Sparkles, User, Calendar, Users, Ruler, Weight, Target, Home, Dumbbell, TreePine, Heart, AlertCircle, Utensils, ArrowRight, Info, AlertTriangle, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface OnboardingData {
@@ -30,10 +30,55 @@ interface EnhancedOnboardingProps {
   userEmail?: string;
 }
 
+// BMI Categories
+type BMICategory = 'underweight' | 'normal' | 'overweight' | 'obese';
+
+const getBMICategory = (bmi: number): BMICategory => {
+  if (bmi < 18.5) return 'underweight';
+  if (bmi < 25) return 'normal';
+  if (bmi < 30) return 'overweight';
+  return 'obese';
+};
+
+const getBMICategoryInfo = (category: BMICategory) => {
+  switch (category) {
+    case 'underweight':
+      return { label: 'Underweight', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' };
+    case 'normal':
+      return { label: 'Normal', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' };
+    case 'overweight':
+      return { label: 'Overweight', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' };
+    case 'obese':
+      return { label: 'Obese', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' };
+  }
+};
+
+const getSuggestedGoal = (category: BMICategory): 'lose-weight' | 'build-muscle' | 'stay-active' => {
+  switch (category) {
+    case 'underweight':
+      return 'build-muscle';
+    case 'normal':
+      return 'stay-active';
+    case 'overweight':
+    case 'obese':
+      return 'lose-weight';
+  }
+};
+
+const getHealthyWeightRange = (heightCm: number): { min: number; max: number } => {
+  const heightM = heightCm / 100;
+  return {
+    min: Math.round(18.5 * heightM * heightM),
+    max: Math.round(24.9 * heightM * heightM)
+  };
+};
+
 export default function EnhancedOnboarding({ onComplete, userEmail }: EnhancedOnboardingProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
+  const [loggedInEmail, setLoggedInEmail] = useState<string | null>(null);
   
   const [formData, setFormData] = useState<OnboardingData>({
     fullName: '',
@@ -49,25 +94,201 @@ export default function EnhancedOnboarding({ onComplete, userEmail }: EnhancedOn
     injuries: ''
   });
 
-  const handleInputChange = (field: keyof OnboardingData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  // Get logged-in user's email
+  useEffect(() => {
+    const fetchUserEmail = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        setLoggedInEmail(user.email);
+        setFormData(prev => ({ ...prev, email: user.email || '' }));
+      }
+    };
+    fetchUserEmail();
+  }, []);
 
-  const handleSubmit = async () => {
-    // Validation
-    if (!formData.fullName || !formData.email || !formData.age || !formData.gender) {
-      setError('Please fill in all required personal information fields');
-      return;
+  // Calculate BMI
+  const bmiData = useMemo(() => {
+    const weight = parseFloat(formData.currentWeight);
+    const height = parseFloat(formData.height);
+    
+    if (!weight || !height || weight <= 0 || height <= 0) return null;
+    if (height < 50 || height > 300 || weight < 20 || weight > 500) return null;
+    
+    const heightM = height / 100;
+    const bmi = weight / (heightM * heightM);
+    const category = getBMICategory(bmi);
+    const categoryInfo = getBMICategoryInfo(category);
+    const suggestedGoal = getSuggestedGoal(category);
+    const healthyRange = getHealthyWeightRange(height);
+    
+    return {
+      value: bmi.toFixed(1),
+      category,
+      categoryInfo,
+      suggestedGoal,
+      healthyRange
+    };
+  }, [formData.currentWeight, formData.height]);
+
+  // Check for goal conflicts
+  const goalWarning = useMemo(() => {
+    if (!bmiData || !formData.primaryGoal) return null;
+    
+    const { category } = bmiData;
+    
+    if (category === 'underweight' && formData.primaryGoal === 'lose-weight') {
+      return 'Warning: You are already underweight. Losing more weight could be harmful to your health. We recommend building muscle instead.';
     }
     
-    if (!formData.currentWeight || !formData.height) {
-      setError('Please fill in your body measurements');
-      return;
+    if (category === 'obese' && formData.primaryGoal === 'build-muscle') {
+      return 'Note: While building muscle is great, combining it with fat loss might give you better health results. Consider a balanced approach.';
+    }
+    
+    return null;
+  }, [bmiData, formData.primaryGoal]);
+
+  // Check target weight validity
+  const targetWeightError = useMemo(() => {
+    if (!formData.targetWeight || !formData.height || !formData.currentWeight) return null;
+    
+    const targetWeight = parseFloat(formData.targetWeight);
+    const height = parseFloat(formData.height);
+    
+    if (targetWeight <= 0) return 'Target weight must be positive.';
+    if (height < 50 || height > 300) return null; // Invalid height, skip check
+    
+    const heightM = height / 100;
+    const targetBMI = targetWeight / (heightM * heightM);
+    const healthyRange = getHealthyWeightRange(height);
+    
+    if (targetBMI < 16) {
+      return `Dangerous: Target weight of ${targetWeight}kg would result in a BMI of ${targetBMI.toFixed(1)}, which is severely underweight and life-threatening. Please set a healthier goal (minimum ${healthyRange.min}kg).`;
+    }
+    
+    if (targetBMI < 18.5) {
+      return `Warning: Target weight of ${targetWeight}kg would result in underweight BMI (${targetBMI.toFixed(1)}). Healthy range for your height: ${healthyRange.min}-${healthyRange.max}kg.`;
+    }
+    
+    if (targetBMI > 40) {
+      return `Target weight of ${targetWeight}kg would result in a very high BMI (${targetBMI.toFixed(1)}). Consider a healthier target.`;
+    }
+    
+    return null;
+  }, [formData.targetWeight, formData.height, formData.currentWeight]);
+
+  const handleInputChange = (field: keyof OnboardingData, value: string) => {
+    // Prevent negative numbers for numeric fields
+    if (['age', 'currentWeight', 'height', 'targetWeight'].includes(field)) {
+      // Allow empty string for clearing
+      if (value === '') {
+        setFormData(prev => ({ ...prev, [field]: value }));
+        setError(null);
+        setWarning(null);
+        return;
+      }
+      const numValue = parseFloat(value);
+      if (isNaN(numValue) || numValue < 0) {
+        return; // Don't update if negative or invalid
+      }
+    }
+    
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setError(null);
+    setWarning(null);
+  };
+
+  const validateForm = (): boolean => {
+    // Required fields
+    if (!formData.fullName.trim()) {
+      setError('Please enter your full name.');
+      return false;
+    }
+    
+    if (!formData.email.trim()) {
+      setError('Please enter your email address.');
+      return false;
+    }
+    
+    // Email must match logged-in user
+    if (loggedInEmail && formData.email.toLowerCase() !== loggedInEmail.toLowerCase()) {
+      setError(`Email must match your login email (${loggedInEmail}). This ensures your data is linked to your account.`);
+      return false;
+    }
+    
+    // Age validation
+    const age = parseInt(formData.age);
+    if (!formData.age || isNaN(age)) {
+      setError('Please enter your age.');
+      return false;
+    }
+    if (age < 13) {
+      setError('You must be at least 13 years old to use BRAVO.');
+      return false;
+    }
+    if (age > 120) {
+      setError('Please enter a valid age.');
+      return false;
+    }
+    
+    if (!formData.gender) {
+      setError('Please select your gender.');
+      return false;
+    }
+    
+    // Weight validation
+    const weight = parseFloat(formData.currentWeight);
+    if (!formData.currentWeight || isNaN(weight)) {
+      setError('Please enter your current weight.');
+      return false;
+    }
+    if (weight < 20 || weight > 500) {
+      setError('Please enter a valid weight (20-500 kg).');
+      return false;
+    }
+    
+    // Height validation
+    const height = parseFloat(formData.height);
+    if (!formData.height || isNaN(height)) {
+      setError('Please enter your height.');
+      return false;
+    }
+    if (height < 50 || height > 300) {
+      setError('Please enter a valid height (50-300 cm). Example: 170 for 170cm.');
+      return false;
     }
     
     if (!formData.primaryGoal) {
-      setError('Please select your primary fitness goal');
-      return;
+      setError('Please select your primary fitness goal.');
+      return false;
+    }
+    
+    // Target weight validation (if provided)
+    if (formData.targetWeight) {
+      const targetWeight = parseFloat(formData.targetWeight);
+      if (isNaN(targetWeight) || targetWeight <= 0) {
+        setError('Please enter a valid target weight.');
+        return false;
+      }
+      
+      const heightM = height / 100;
+      const targetBMI = targetWeight / (heightM * heightM);
+      
+      if (targetBMI < 16) {
+        setError(`Target weight ${targetWeight}kg is dangerously low (BMI: ${targetBMI.toFixed(1)}). This poses serious health risks. Please adjust your target weight.`);
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
+
+    // Show warning but allow submission if goal conflicts
+    if (goalWarning && !warning) {
+      setWarning(goalWarning);
+      return; // User needs to confirm by clicking again
     }
 
     try {
@@ -78,27 +299,32 @@ export default function EnhancedOnboarding({ onComplete, userEmail }: EnhancedOn
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
+        // Calculate date of birth from age
+        const birthYear = new Date().getFullYear() - parseInt(formData.age);
+        const dateOfBirth = new Date(birthYear, 0, 1).toISOString().split('T')[0];
+
         // Save to user_profiles table
         const { error: profileError } = await supabase
           .from('user_profiles')
           .upsert({
             id: user.id,
             full_name: formData.fullName,
-            date_of_birth: new Date(new Date().getFullYear() - parseInt(formData.age), 0, 1).toISOString().split('T')[0],
+            date_of_birth: dateOfBirth,
             gender: formData.gender,
             height_cm: parseFloat(formData.height),
             weight_kg: parseFloat(formData.currentWeight),
             fitness_level: 'beginner',
+            onboarding_completed: true,
             updated_at: new Date().toISOString()
           });
 
         if (profileError) throw profileError;
 
         // Save goal if target weight is provided
-        if (formData.targetWeight && user) {
+        if (formData.targetWeight) {
           await supabase
             .from('user_goals')
-            .insert({
+            .upsert({
               user_id: user.id,
               goal_type: formData.primaryGoal,
               target_value: parseFloat(formData.targetWeight),
@@ -121,18 +347,18 @@ export default function EnhancedOnboarding({ onComplete, userEmail }: EnhancedOn
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-500 via-emerald-400 to-green-400 flex items-center justify-center p-4 py-8 overflow-y-auto">
-      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8 my-8">
+    <div className="min-h-screen bg-gradient-to-br from-teal-500 via-emerald-400 to-green-400 flex items-center justify-center p-3 sm:p-4 py-6 sm:py-8 overflow-y-auto">
+      <div className="w-full max-w-2xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl p-5 sm:p-8 my-4 sm:my-8">
         
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-block bg-gradient-to-r from-teal-500 to-emerald-400 rounded-2xl p-4 mb-4">
-            <Sparkles className="text-white" size={48} />
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="inline-block bg-gradient-to-r from-teal-500 to-emerald-400 rounded-xl sm:rounded-2xl p-3 sm:p-4 mb-3 sm:mb-4">
+            <Sparkles className="text-white" size={36} />
           </div>
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">
+          <h1 className="text-2xl sm:text-4xl font-bold text-gray-800 mb-2">
             Welcome to BRAVO
           </h1>
-          <p className="text-gray-600">Your AI-powered fitness companion. Let's create your personalized plan!</p>
+          <p className="text-gray-600 text-sm sm:text-base px-2">Your AI-powered fitness companion. Let's create your personalized plan!</p>
         </div>
 
         {/* Error Message */}
@@ -140,6 +366,17 @@ export default function EnhancedOnboarding({ onComplete, userEmail }: EnhancedOn
           <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
             <p className="text-red-800 text-sm">{error}</p>
+          </div>
+        )}
+
+        {/* Warning Message */}
+        {warning && (
+          <div className="mb-6 p-4 bg-amber-50 border-l-4 border-amber-500 rounded-lg flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-amber-800 text-sm">{warning}</p>
+              <p className="text-amber-700 text-xs mt-2 font-medium">Click "Generate My Plan" again to continue anyway.</p>
+            </div>
           </div>
         )}
 
@@ -169,25 +406,32 @@ export default function EnhancedOnboarding({ onComplete, userEmail }: EnhancedOn
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Email Address <span className="text-red-500">*</span>
+                  {loggedInEmail && (
+                    <span className="text-xs text-gray-500 font-normal ml-2">(Must match: {loggedInEmail})</span>
+                  )}
                 </label>
                 <input
                   type="email"
                   placeholder="your.email@example.com"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-teal-500"
+                  readOnly={!!loggedInEmail}
+                  className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-teal-500 ${loggedInEmail ? 'bg-gray-50 cursor-not-allowed' : ''}`}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     <Calendar className="w-4 h-4 inline mr-1" />
                     Age <span className="text-red-500">*</span>
+                    <span className="text-xs text-gray-500 font-normal ml-1">(13+)</span>
                   </label>
                   <input
                     type="number"
                     placeholder="25"
+                    min="13"
+                    max="120"
                     value={formData.age}
                     onChange={(e) => handleInputChange('age', e.target.value)}
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-teal-500"
@@ -223,43 +467,96 @@ export default function EnhancedOnboarding({ onComplete, userEmail }: EnhancedOn
             </div>
             
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Current Weight (kg) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  placeholder="70"
-                  value={formData.currentWeight}
-                  onChange={(e) => handleInputChange('currentWeight', e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-teal-500"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <Weight className="w-4 h-4 inline mr-1" />
+                    Current Weight (kg) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="70"
+                    min="20"
+                    max="500"
+                    value={formData.currentWeight}
+                    onChange={(e) => handleInputChange('currentWeight', e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <Ruler className="w-4 h-4 inline mr-1" />
+                    Height (cm) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="170"
+                    min="50"
+                    max="300"
+                    value={formData.height}
+                    onChange={(e) => handleInputChange('height', e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-teal-500"
+                  />
+                </div>
               </div>
+
+              {/* BMI Display */}
+              {bmiData && (
+                <div className={`p-4 rounded-xl ${bmiData.categoryInfo.bg} ${bmiData.categoryInfo.border} border-2`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Info className={`w-5 h-5 ${bmiData.categoryInfo.color}`} />
+                      <span className="font-semibold text-gray-700">Your BMI</span>
+                    </div>
+                    <span className={`text-2xl font-bold ${bmiData.categoryInfo.color}`}>{bmiData.value}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-sm font-medium ${bmiData.categoryInfo.color}`}>
+                      {bmiData.categoryInfo.label}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      Healthy range: {bmiData.healthyRange.min}-{bmiData.healthyRange.max} kg
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-teal-500" />
+                    <span className="text-xs text-gray-600">
+                      Suggested goal: <span className="font-semibold capitalize">{bmiData.suggestedGoal.replace('-', ' ')}</span>
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Height (cm) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  placeholder="170"
-                  value={formData.height}
-                  onChange={(e) => handleInputChange('height', e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-teal-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <Target className="w-4 h-4 inline mr-1" />
                   Target Weight (kg)
+                  {bmiData && (
+                    <span className="text-xs text-gray-500 font-normal ml-2">
+                      (Suggested: {bmiData.healthyRange.min}-{bmiData.healthyRange.max} kg)
+                    </span>
+                  )}
                 </label>
                 <input
                   type="number"
-                  placeholder="65"
+                  placeholder={bmiData ? `${bmiData.healthyRange.min}` : "65"}
+                  min="20"
+                  max="300"
                   value={formData.targetWeight}
                   onChange={(e) => handleInputChange('targetWeight', e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-teal-500"
+                  className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none ${
+                    targetWeightError 
+                      ? 'border-red-300 focus:border-red-500 bg-red-50' 
+                      : 'border-gray-200 focus:border-teal-500'
+                  }`}
                 />
+                {targetWeightError && (
+                  <p className="mt-2 text-sm text-red-600 flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    {targetWeightError}
+                  </p>
+                )}
               </div>
             </div>
           </section>
@@ -274,28 +571,51 @@ export default function EnhancedOnboarding({ onComplete, userEmail }: EnhancedOn
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-3">
                 Primary Goal <span className="text-red-500">*</span>
+                {bmiData && (
+                  <span className="text-xs text-teal-600 font-normal ml-2">
+                    (Recommended: {bmiData.suggestedGoal.replace('-', ' ')})
+                  </span>
+                )}
               </label>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {[
                   { id: 'lose-weight', label: 'Lose Weight', emoji: '🔥', icon: Weight },
                   { id: 'build-muscle', label: 'Build Muscle', emoji: '💪', icon: Dumbbell },
                   { id: 'stay-active', label: 'Stay Active', emoji: '🏃', icon: Heart }
-                ].map(goal => (
-                  <button
-                    key={goal.id}
-                    type="button"
-                    onClick={() => handleInputChange('primaryGoal', goal.id)}
-                    className={`p-4 rounded-xl border-2 transition-all ${
-                      formData.primaryGoal === goal.id
-                        ? 'border-teal-500 bg-teal-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="text-3xl mb-2">{goal.emoji}</div>
-                    <div className="text-sm font-semibold text-gray-800">{goal.label}</div>
-                  </button>
-                ))}
+                ].map(goal => {
+                  const isRecommended = bmiData?.suggestedGoal === goal.id;
+                  return (
+                    <button
+                      key={goal.id}
+                      type="button"
+                      onClick={() => handleInputChange('primaryGoal', goal.id)}
+                      className={`p-4 rounded-xl border-2 transition-all relative ${
+                        formData.primaryGoal === goal.id
+                          ? 'border-teal-500 bg-teal-50'
+                          : isRecommended
+                          ? 'border-teal-200 bg-teal-50/50 hover:border-teal-300'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      {isRecommended && (
+                        <span className="absolute -top-2 -right-2 bg-teal-500 text-white text-xs px-2 py-0.5 rounded-full">
+                          ★
+                        </span>
+                      )}
+                      <div className="text-3xl mb-2">{goal.emoji}</div>
+                      <div className="text-sm font-semibold text-gray-800">{goal.label}</div>
+                    </button>
+                  );
+                })}
               </div>
+              
+              {/* Goal Warning */}
+              {goalWarning && formData.primaryGoal && (
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-800">{goalWarning}</p>
+                </div>
+              )}
             </div>
           </section>
 
@@ -305,7 +625,7 @@ export default function EnhancedOnboarding({ onComplete, userEmail }: EnhancedOn
               <label className="block text-sm font-semibold text-gray-700 mb-3">
                 Preferred Workout Location
               </label>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {[
                   { id: 'home', label: 'Home', emoji: '🏠', icon: Home },
                   { id: 'gym', label: 'Gym', emoji: '🏋️', icon: Dumbbell },
@@ -393,13 +713,18 @@ export default function EnhancedOnboarding({ onComplete, userEmail }: EnhancedOn
           <div className="pt-4">
             <button
               onClick={handleSubmit}
-              disabled={loading}
+              disabled={loading || !!(targetWeightError && targetWeightError.includes('Dangerous'))}
               className="w-full bg-gradient-to-r from-teal-500 to-emerald-400 text-white font-bold py-4 rounded-xl hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   Creating Your Plan...
+                </>
+              ) : warning ? (
+                <>
+                  Continue Anyway
+                  <ArrowRight size={20} />
                 </>
               ) : (
                 <>

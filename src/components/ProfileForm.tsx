@@ -14,9 +14,10 @@ interface ProfileData {
 
 interface ProfileFormProps {
   onComplete?: () => void
+  isDark?: boolean
 }
 
-export default function ProfileForm({ onComplete }: ProfileFormProps) {
+export default function ProfileForm({ onComplete, isDark = false }: ProfileFormProps) {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [profile, setProfile] = useState<ProfileData>({
@@ -103,47 +104,47 @@ export default function ProfileForm({ onComplete }: ProfileFormProps) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-6">Complete Your Profile</h2>
+    <div className={`max-w-2xl mx-auto p-4 sm:p-6 rounded-lg ${isDark ? 'bg-transparent' : 'bg-white shadow-md'}`}>
+      <h2 className={`text-xl sm:text-2xl font-bold mb-4 sm:mb-6 ${isDark ? 'text-white' : 'text-gray-800'}`}>Complete Your Profile</h2>
       
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
         {/* Username */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
             Username
           </label>
           <input
             type="text"
             value={profile.username}
             onChange={(e) => setProfile({ ...profile, username: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 ${isDark ? 'bg-white/5 border-white/20 text-white placeholder-gray-400' : 'border-gray-300 bg-white'}`}
             placeholder="johndoe"
           />
         </div>
 
         {/* Full Name */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
             Full Name
           </label>
           <input
             type="text"
             value={profile.full_name}
             onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 ${isDark ? 'bg-white/5 border-white/20 text-white placeholder-gray-400' : 'border-gray-300 bg-white'}`}
             placeholder="John Doe"
           />
         </div>
 
         {/* Bio */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
             Bio
           </label>
           <textarea
             value={profile.bio}
             onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 ${isDark ? 'bg-white/5 border-white/20 text-white placeholder-gray-400' : 'border-gray-300 bg-white'}`}
             placeholder="Tell us about yourself..."
             rows={3}
           />
@@ -151,38 +152,38 @@ export default function ProfileForm({ onComplete }: ProfileFormProps) {
 
         {/* Date of Birth */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
             Date of Birth
           </label>
           <input
             type="date"
             value={profile.date_of_birth}
             onChange={(e) => setProfile({ ...profile, date_of_birth: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 ${isDark ? 'bg-white/5 border-white/20 text-white' : 'border-gray-300 bg-white'}`}
           />
         </div>
 
         {/* Gender */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
             Gender
           </label>
           <select
             value={profile.gender}
             onChange={(e) => setProfile({ ...profile, gender: e.target.value as any })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 ${isDark ? 'bg-white/5 border-white/20 text-white' : 'border-gray-300 bg-white'}`}
           >
-            <option value="">Select gender</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="other">Other</option>
-            <option value="prefer_not_to_say">Prefer not to say</option>
+            <option value="" className={isDark ? 'bg-slate-800' : ''}>Select gender</option>
+            <option value="male" className={isDark ? 'bg-slate-800' : ''}>Male</option>
+            <option value="female" className={isDark ? 'bg-slate-800' : ''}>Female</option>
+            <option value="other" className={isDark ? 'bg-slate-800' : ''}>Other</option>
+            <option value="prefer_not_to_say" className={isDark ? 'bg-slate-800' : ''}>Prefer not to say</option>
           </select>
         </div>
 
         {/* Height */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
             Height (cm)
           </label>
           <input
@@ -190,14 +191,14 @@ export default function ProfileForm({ onComplete }: ProfileFormProps) {
             step="0.01"
             value={profile.height_cm}
             onChange={(e) => setProfile({ ...profile, height_cm: e.target.value ? parseFloat(e.target.value) : '' })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 ${isDark ? 'bg-white/5 border-white/20 text-white placeholder-gray-400' : 'border-gray-300 bg-white'}`}
             placeholder="170"
           />
         </div>
 
         {/* Weight */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
             Weight (kg)
           </label>
           <input
@@ -205,31 +206,31 @@ export default function ProfileForm({ onComplete }: ProfileFormProps) {
             step="0.01"
             value={profile.weight_kg}
             onChange={(e) => setProfile({ ...profile, weight_kg: e.target.value ? parseFloat(e.target.value) : '' })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 ${isDark ? 'bg-white/5 border-white/20 text-white placeholder-gray-400' : 'border-gray-300 bg-white'}`}
             placeholder="70"
           />
         </div>
 
         {/* Fitness Level */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
             Fitness Level
           </label>
           <select
             value={profile.fitness_level}
             onChange={(e) => setProfile({ ...profile, fitness_level: e.target.value as any })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 ${isDark ? 'bg-white/5 border-white/20 text-white' : 'border-gray-300 bg-white'}`}
           >
-            <option value="">Select fitness level</option>
-            <option value="beginner">Beginner</option>
-            <option value="intermediate">Intermediate</option>
-            <option value="advanced">Advanced</option>
+            <option value="" className={isDark ? 'bg-slate-800' : ''}>Select fitness level</option>
+            <option value="beginner" className={isDark ? 'bg-slate-800' : ''}>Beginner</option>
+            <option value="intermediate" className={isDark ? 'bg-slate-800' : ''}>Intermediate</option>
+            <option value="advanced" className={isDark ? 'bg-slate-800' : ''}>Advanced</option>
           </select>
         </div>
 
         {/* Message */}
         {message && (
-          <div className={`p-3 rounded ${message.includes('✅') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+          <div className={`p-3 rounded ${message.includes('✅') ? (isDark ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-700') : (isDark ? 'bg-red-900/30 text-red-300' : 'bg-red-100 text-red-700')}`}>
             {message}
           </div>
         )}
@@ -238,7 +239,7 @@ export default function ProfileForm({ onComplete }: ProfileFormProps) {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          className="w-full bg-gradient-to-r from-teal-500 to-emerald-400 text-white py-2.5 sm:py-3 px-4 rounded-lg sm:rounded-xl font-semibold text-sm sm:text-base hover:shadow-lg hover:shadow-teal-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
           {loading ? 'Saving...' : 'Save Profile'}
         </button>

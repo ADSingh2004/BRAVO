@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Play, Check, X, Timer, Dumbbell, ChevronRight, Trophy, Flame, Volume2, VolumeX, ArrowLeft } from 'lucide-react';
 
 interface WorkoutInterfaceProps {
@@ -13,6 +13,8 @@ export default function WorkoutInterface({ onBack }: WorkoutInterfaceProps = {})
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [restTimer, setRestTimer] = useState(60);
   const [isResting, setIsResting] = useState(false);
+  const timerStartRef = useRef<number | null>(null);
+  const restEndRef = useRef<number | null>(null);
   const [completedSets, setCompletedSets] = useState<Record<string, boolean>>({});
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [totalCaloriesBurned, setTotalCaloriesBurned] = useState(0);
@@ -33,38 +35,42 @@ export default function WorkoutInterface({ onBack }: WorkoutInterfaceProps = {})
 
   const currentExercise = workoutPlan.exercises[currentExerciseIndex];
 
-  // Timer effect
+  // Accurate timer using timestamps (avoids interval drift)
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined;
-    if (isTimerRunning) {
+    if (isTimerRunning && timerStartRef.current) {
       interval = setInterval(() => {
-        setTimer(prev => prev + 1);
-      }, 1000);
+        const start = timerStartRef.current as number;
+        const elapsed = Math.floor((Date.now() - start) / 1000);
+        setTimer(elapsed);
+      }, 250);
     }
     return () => {
       if (interval) clearInterval(interval);
     };
   }, [isTimerRunning]);
 
-  // Rest timer effect
+  // Accurate rest timer using end timestamp
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined;
-    if (isResting && restTimer > 0) {
+    if (isResting && restEndRef.current) {
       interval = setInterval(() => {
-        setRestTimer(prev => {
-          if (prev <= 1) {
-            setIsResting(false);
-            setCurrentView('workout');
-            return currentExercise.rest;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+        const remainingMs = (restEndRef.current as number) - Date.now();
+        const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+        setRestTimer(remainingSec);
+        if (remainingSec <= 0) {
+          setIsResting(false);
+          // move back to workout view
+          setCurrentView('workout');
+          // reset rest timer to default for UI
+          setRestTimer(currentExercise.rest ?? 0);
+        }
+      }, 200);
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isResting, restTimer, currentExercise]);
+  }, [isResting, currentExercise]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -74,6 +80,9 @@ export default function WorkoutInterface({ onBack }: WorkoutInterfaceProps = {})
 
   const handleStartWorkout = () => {
     setCurrentView('workout');
+    // start accurate timer
+    timerStartRef.current = Date.now();
+    setTimer(0);
     setIsTimerRunning(true);
   };
 
@@ -85,6 +94,8 @@ export default function WorkoutInterface({ onBack }: WorkoutInterfaceProps = {})
     if (currentSet < currentExercise.sets) {
       // More sets remaining
       setCurrentSet(prev => prev + 1);
+      // set rest end timestamp for accurate countdown
+      restEndRef.current = Date.now() + currentExercise.rest * 1000;
       setRestTimer(currentExercise.rest);
       setIsResting(true);
       setCurrentView('rest');
@@ -93,7 +104,10 @@ export default function WorkoutInterface({ onBack }: WorkoutInterfaceProps = {})
       if (currentExerciseIndex < workoutPlan.exercises.length - 1) {
         setCurrentExerciseIndex(prev => prev + 1);
         setCurrentSet(1);
-        setRestTimer(60);
+        // next exercise rest duration
+        const nextRest = workoutPlan.exercises[currentExerciseIndex + 1]?.rest ?? 60;
+        restEndRef.current = Date.now() + nextRest * 1000;
+        setRestTimer(nextRest);
         setIsResting(true);
         setCurrentView('rest');
       } else {
@@ -118,173 +132,194 @@ export default function WorkoutInterface({ onBack }: WorkoutInterfaceProps = {})
 
   const handleSkipRest = () => {
     setIsResting(false);
+    restEndRef.current = null;
     setRestTimer(currentExercise.rest);
     setCurrentView('workout');
   };
 
-  // Ready Screen
+  // Ready Screen - Purple gradient hero card style (matches dashboard Today's Workout)
   const ReadyScreen = () => (
-    <div className="min-h-screen bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center p-6">
-      <div className="max-w-2xl w-full bg-white rounded-3xl shadow-2xl p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 p-4 lg:p-6 text-white">
+      <div className="max-w-4xl mx-auto">
         {/* Back Button */}
         {onBack && (
           <button
             onClick={onBack}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6 transition-colors"
+            className="flex items-center gap-2 text-white/80 hover:text-white mb-4 lg:mb-6 transition-colors text-sm lg:text-base"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4 lg:w-5 lg:h-5" />
             <span className="font-semibold">Back to Dashboard</span>
           </button>
         )}
-        
-        <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-teal-500 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Dumbbell className="w-10 h-10 text-white" />
+
+        {/* Hero Card - Purple Gradient like Dashboard */}
+        <div className="bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 rounded-2xl lg:rounded-3xl p-5 lg:p-8 mb-4 lg:mb-6 relative overflow-hidden">
+          {/* Decorative icon */}
+          <div className="absolute top-3 right-3 lg:top-4 lg:right-4 w-12 h-12 lg:w-16 lg:h-16 bg-white/20 backdrop-blur-sm rounded-xl lg:rounded-2xl flex items-center justify-center">
+            <Dumbbell className="w-6 h-6 lg:w-8 lg:h-8 text-white" />
           </div>
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">{workoutPlan.name}</h1>
-          <p className="text-gray-600">Ready to crush your workout?</p>
+          
+          <p className="text-white/80 text-xs lg:text-sm font-medium uppercase tracking-wider mb-1 lg:mb-2">TODAY'S WORKOUT</p>
+          <h1 className="text-2xl lg:text-4xl font-bold text-white mb-3 lg:mb-4 pr-14 lg:pr-20">{workoutPlan.name}</h1>
+          
+          <div className="flex items-center gap-4 lg:gap-6 text-white/90 mb-4 lg:mb-6 text-sm lg:text-base">
+            <div className="flex items-center gap-1.5 lg:gap-2">
+              <Timer className="w-4 h-4 lg:w-5 lg:h-5" />
+              <span>{workoutPlan.duration}</span>
+            </div>
+            <div className="flex items-center gap-1.5 lg:gap-2">
+              <Dumbbell className="w-4 h-4 lg:w-5 lg:h-5" />
+              <span>{workoutPlan.exercises.length} exercises</span>
+            </div>
+          </div>
+          
+          {/* Start Button inside hero */}
+          <button
+            onClick={handleStartWorkout}
+            className="w-full py-3 lg:py-4 bg-white text-purple-600 font-bold text-base lg:text-lg rounded-xl flex items-center justify-center gap-2 lg:gap-3 hover:bg-white/90 transition-all shadow-lg"
+          >
+            <Play className="w-5 h-5 lg:w-6 lg:h-6" />
+            Start Workout
+          </button>
         </div>
 
-        {/* Workout Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className="bg-teal-50 rounded-xl p-4 text-center">
-            <Timer className="w-6 h-6 text-teal-600 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-teal-600">{workoutPlan.duration}</p>
-            <p className="text-sm text-gray-600">Duration</p>
+        {/* Stats Cards Row */}
+        <div className="grid grid-cols-3 gap-2 lg:gap-4 mb-4 lg:mb-6">
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl lg:rounded-2xl p-3 lg:p-5 text-center border border-white/10">
+            <Timer className="w-5 h-5 lg:w-6 lg:h-6 text-teal-400 mx-auto mb-1 lg:mb-2" />
+            <p className="text-lg lg:text-2xl font-bold text-white">{workoutPlan.duration}</p>
+            <p className="text-xs lg:text-sm text-white/60">Duration</p>
           </div>
-          <div className="bg-orange-50 rounded-xl p-4 text-center">
-            <Flame className="w-6 h-6 text-orange-600 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-orange-600">{workoutPlan.caloriesEstimate}</p>
-            <p className="text-sm text-gray-600">Calories</p>
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl lg:rounded-2xl p-3 lg:p-5 text-center border border-white/10">
+            <Flame className="w-5 h-5 lg:w-6 lg:h-6 text-orange-400 mx-auto mb-1 lg:mb-2" />
+            <p className="text-lg lg:text-2xl font-bold text-white">{workoutPlan.caloriesEstimate}</p>
+            <p className="text-xs lg:text-sm text-white/60">Calories</p>
           </div>
-          <div className="bg-purple-50 rounded-xl p-4 text-center">
-            <Dumbbell className="w-6 h-6 text-purple-600 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-purple-600">{workoutPlan.exercises.length}</p>
-            <p className="text-sm text-gray-600">Exercises</p>
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl lg:rounded-2xl p-3 lg:p-5 text-center border border-white/10">
+            <Dumbbell className="w-5 h-5 lg:w-6 lg:h-6 text-purple-400 mx-auto mb-1 lg:mb-2" />
+            <p className="text-lg lg:text-2xl font-bold text-white">{workoutPlan.exercises.length}</p>
+            <p className="text-xs lg:text-sm text-white/60">Exercises</p>
           </div>
         </div>
 
         {/* Exercise List */}
-        <div className="mb-8">
-          <h3 className="font-bold text-gray-800 mb-4">Today's Exercises</h3>
-          <div className="space-y-2">
+        <div className="bg-white/10 backdrop-blur-sm rounded-xl lg:rounded-2xl p-4 lg:p-6 border border-white/10">
+          <h3 className="font-bold text-white mb-3 lg:mb-4 text-sm lg:text-base">Today's Exercises</h3>
+          <div className="space-y-2 lg:space-y-3">
             {workoutPlan.exercises.map((exercise, idx) => (
-              <div key={exercise.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-teal-500 rounded-lg flex items-center justify-center text-white font-bold">
+              <div key={exercise.id} className="flex items-center justify-between p-3 lg:p-4 bg-white/5 rounded-lg lg:rounded-xl border border-white/5">
+                <div className="flex items-center gap-2 lg:gap-3">
+                  <div className="w-7 h-7 lg:w-8 lg:h-8 bg-teal-500 rounded-md lg:rounded-lg flex items-center justify-center text-white font-bold text-xs lg:text-sm">
                     {idx + 1}
                   </div>
-                  <span className="font-medium text-gray-800">{exercise.name}</span>
+                  <span className="font-medium text-white text-sm lg:text-base truncate max-w-[150px] sm:max-w-none">{exercise.name}</span>
                 </div>
-                <span className="text-sm text-gray-500">{exercise.sets} × {exercise.reps}</span>
+                <span className="text-xs lg:text-sm text-white/60">{exercise.sets} × {exercise.reps}</span>
               </div>
             ))}
           </div>
         </div>
-
-        {/* Start Button */}
-        <button
-          onClick={handleStartWorkout}
-          className="w-full py-5 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white font-bold text-xl rounded-xl shadow-lg flex items-center justify-center gap-3 transition-all"
-        >
-          <Play className="w-6 h-6" />
-          Start Workout
-        </button>
       </div>
     </div>
   );
 
   // Workout Screen
   const WorkoutScreen = () => (
-    <div className="min-h-screen bg-gray-900 text-white">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-teal-500 to-teal-600 p-6 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <button className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors">
-              <X className="w-6 h-6" onClick={() => setCurrentView('ready')} />
-            </button>
-            <div className="text-center">
-              <p className="text-teal-100 text-sm">Workout Time</p>
-              <p className="text-2xl font-bold">{formatTime(timer)}</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-teal-900 to-slate-900 text-white">
+      {/* Glassy Hero Header */}
+      <div className="relative sticky top-0 z-10">
+        <div className="absolute inset-0 bg-gradient-to-r from-teal-600/40 to-emerald-600/40 backdrop-blur-3xl" />
+        <div className="relative bg-white/10 backdrop-blur-xl border-b border-white/10">
+          <div className="max-w-4xl mx-auto px-4 lg:px-6 py-3 lg:py-4">
+            <div className="flex items-center justify-between mb-3 lg:mb-4">
+              <button 
+                onClick={() => setCurrentView('ready')}
+                className="p-2 lg:p-3 bg-white/10 hover:bg-white/20 rounded-lg lg:rounded-xl backdrop-blur-sm transition-all"
+              >
+                <X className="w-4 h-4 lg:w-5 lg:h-5" />
+              </button>
+              <div className="text-center bg-white/10 backdrop-blur-sm rounded-xl lg:rounded-2xl px-5 lg:px-8 py-2 lg:py-3">
+                <p className="text-teal-200 text-xs font-medium">Workout Time</p>
+                <p className="text-2xl lg:text-3xl font-bold text-white">{formatTime(timer)}</p>
+              </div>
+              <button 
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                className="p-2 lg:p-3 bg-white/10 hover:bg-white/20 rounded-lg lg:rounded-xl backdrop-blur-sm transition-all"
+              >
+                {soundEnabled ? <Volume2 className="w-4 h-4 lg:w-5 lg:h-5" /> : <VolumeX className="w-4 h-4 lg:w-5 lg:h-5" />}
+              </button>
             </div>
-            <button 
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors"
-            >
-              {soundEnabled ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
-            </button>
+            
+            {/* Progress Bar */}
+            <div className="w-full bg-white/20 rounded-full h-2.5 backdrop-blur-sm">
+              <div 
+                className="bg-gradient-to-r from-teal-400 to-emerald-400 h-2.5 rounded-full transition-all duration-500 shadow-lg shadow-teal-500/30"
+                style={{ width: `${((currentExerciseIndex + 1) / workoutPlan.exercises.length) * 100}%` }}
+              />
+            </div>
+            <p className="text-center text-teal-200 text-sm mt-3 font-medium">
+              Exercise {currentExerciseIndex + 1} of {workoutPlan.exercises.length}
+            </p>
           </div>
-          
-          {/* Progress Bar */}
-          <div className="w-full bg-white bg-opacity-20 rounded-full h-2">
-            <div 
-              className="bg-white h-2 rounded-full transition-all duration-300"
-              style={{ width: `${((currentExerciseIndex + 1) / workoutPlan.exercises.length) * 100}%` }}
-            />
-          </div>
-          <p className="text-center text-teal-100 text-sm mt-2">
-            Exercise {currentExerciseIndex + 1} of {workoutPlan.exercises.length}
-          </p>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="max-w-4xl mx-auto p-4 lg:p-6">
         {/* Exercise Info */}
-        <div className="bg-gray-800 rounded-2xl p-8 mb-6 text-center">
-          <div className="w-24 h-24 bg-teal-500 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Dumbbell className="w-12 h-12" />
+        <div className="bg-white/10 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-5 lg:p-8 mb-4 lg:mb-6 text-center">
+          <div className="w-20 h-20 lg:w-28 lg:h-28 bg-gradient-to-br from-teal-500 to-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4 lg:mb-6 shadow-xl shadow-teal-500/30">
+            <Dumbbell className="w-10 h-10 lg:w-14 lg:h-14" />
           </div>
-          <h2 className="text-4xl font-bold mb-4">{currentExercise.name}</h2>
-          <p className="text-gray-400 text-lg mb-6">{currentExercise.instructions}</p>
+          <h2 className="text-2xl lg:text-4xl font-bold mb-2 lg:mb-4 bg-gradient-to-r from-white to-teal-200 bg-clip-text text-transparent">{currentExercise.name}</h2>
+          <p className="text-white/60 text-sm lg:text-lg mb-5 lg:mb-8">{currentExercise.instructions}</p>
           
           {/* Set Counter */}
-          <div className="inline-block bg-gray-700 rounded-full px-8 py-4">
-            <p className="text-gray-400 text-sm mb-1">Current Set</p>
-            <p className="text-5xl font-bold text-teal-400">{currentSet}/{currentExercise.sets}</p>
+          <div className="inline-block bg-white/10 backdrop-blur-sm rounded-xl lg:rounded-2xl px-6 lg:px-10 py-3 lg:py-5 border border-white/20">
+            <p className="text-teal-300 text-xs lg:text-sm mb-1 font-medium">Current Set</p>
+            <p className="text-4xl lg:text-6xl font-bold bg-gradient-to-r from-teal-400 to-emerald-400 bg-clip-text text-transparent">{currentSet}/{currentExercise.sets}</p>
           </div>
 
           {/* Reps */}
-          <div className="mt-6 flex items-center justify-center gap-8">
-            <div className="text-center">
-              <p className="text-gray-400 text-sm mb-1">Target Reps</p>
-              <p className="text-4xl font-bold">{currentExercise.reps}</p>
+          <div className="mt-5 lg:mt-8 flex items-center justify-center gap-4 lg:gap-8">
+            <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg lg:rounded-xl px-4 lg:px-6 py-3 lg:py-4 border border-white/10">
+              <p className="text-white/50 text-xs lg:text-sm mb-1">Target Reps</p>
+              <p className="text-2xl lg:text-4xl font-bold">{currentExercise.reps}</p>
             </div>
-            <div className="text-center">
-              <p className="text-gray-400 text-sm mb-1">Rest Time</p>
-              <p className="text-4xl font-bold">{currentExercise.rest}s</p>
+            <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg lg:rounded-xl px-4 lg:px-6 py-3 lg:py-4 border border-white/10">
+              <p className="text-white/50 text-xs lg:text-sm mb-1">Rest Time</p>
+              <p className="text-2xl lg:text-4xl font-bold">{currentExercise.rest}s</p>
             </div>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-4">
+        <div className="flex gap-3 lg:gap-4">
           <button
             onClick={handleSkipExercise}
-            className="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl transition-all"
+            className="flex-1 py-3 lg:py-4 bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 text-white font-bold rounded-xl lg:rounded-2xl transition-all text-sm lg:text-base"
           >
             Skip Exercise
           </button>
           <button
             onClick={handleCompleteSet}
-            className="flex-1 py-4 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all"
+            className="flex-1 py-3 lg:py-4 bg-gradient-to-r from-teal-500 to-emerald-400 hover:from-teal-600 hover:to-emerald-500 text-white font-bold rounded-xl lg:rounded-2xl shadow-lg shadow-teal-500/25 flex items-center justify-center gap-2 transition-all text-sm lg:text-base"
           >
-            <Check className="w-6 h-6" />
+            <Check className="w-5 h-5 lg:w-6 lg:h-6" />
             Complete Set
           </button>
         </div>
 
         {/* Completed Sets Indicator */}
-        <div className="mt-6 flex justify-center gap-2">
+        <div className="mt-6 lg:mt-8 flex justify-center gap-2 lg:gap-3">
           {[...Array(currentExercise.sets)].map((_, idx) => (
             <div
               key={idx}
-              className={`w-12 h-12 rounded-lg flex items-center justify-center font-bold transition-all ${
+              className={`w-10 h-10 lg:w-14 lg:h-14 rounded-lg lg:rounded-xl flex items-center justify-center font-bold transition-all border text-sm lg:text-base ${
                 completedSets[`${currentExerciseIndex}-${idx + 1}`]
-                  ? 'bg-teal-500 text-white'
+                  ? 'bg-gradient-to-br from-teal-500 to-emerald-400 text-white border-transparent shadow-lg shadow-teal-500/25'
                   : idx + 1 === currentSet
-                  ? 'bg-teal-300 text-gray-800'
-                  : 'bg-gray-700 text-gray-500'
+                  ? 'bg-teal-400/30 text-teal-300 border-teal-400/50'
+                  : 'bg-white/10 text-white/40 border-white/10'
               }`}
             >
               {idx + 1}
@@ -295,108 +330,170 @@ export default function WorkoutInterface({ onBack }: WorkoutInterfaceProps = {})
     </div>
   );
 
-  // Rest Screen
+  // Rest Screen - Teal/Green gradient theme (matches Workout Screen - Image 4)
   const RestScreen = () => (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center p-6">
-      <div className="max-w-2xl w-full text-center text-white">
-        <div className="mb-8">
-          <div className="w-32 h-32 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-6 backdrop-blur-sm">
-            <Timer className="w-16 h-16" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-teal-900 to-slate-900 text-white">
+      {/* Glassy Header - Same style as workout screen */}
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-teal-600/40 to-emerald-600/40 backdrop-blur-3xl" />
+        <div className="relative bg-white/10 backdrop-blur-xl border-b border-white/10">
+          <div className="max-w-4xl mx-auto px-4 lg:px-6 py-3 lg:py-4">
+            <div className="flex items-center justify-between">
+              <button 
+                onClick={() => setCurrentView('workout')}
+                className="p-2 lg:p-3 bg-white/10 hover:bg-white/20 rounded-lg lg:rounded-xl backdrop-blur-sm transition-all"
+              >
+                <X className="w-4 h-4 lg:w-5 lg:h-5" />
+              </button>
+              <div className="text-center bg-white/10 backdrop-blur-sm rounded-xl lg:rounded-2xl px-5 lg:px-8 py-2 lg:py-3">
+                <p className="text-teal-200 text-xs font-medium">Workout Time</p>
+                <p className="text-2xl lg:text-3xl font-bold text-white">{formatTime(timer)}</p>
+              </div>
+              <button 
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                className="p-2 lg:p-3 bg-white/10 hover:bg-white/20 rounded-lg lg:rounded-xl backdrop-blur-sm transition-all"
+              >
+                {soundEnabled ? <Volume2 className="w-4 h-4 lg:w-5 lg:h-5" /> : <VolumeX className="w-4 h-4 lg:w-5 lg:h-5" />}
+              </button>
+            </div>
           </div>
-          <h1 className="text-5xl font-bold mb-4">Rest Time</h1>
-          <p className="text-blue-100 text-xl">Take a breather, you're doing great!</p>
+        </div>
+      </div>
+
+      {/* Rest Content */}
+      <div className="max-w-4xl mx-auto p-4 lg:p-6">
+        <div className="bg-white/10 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-5 lg:p-8 text-center">
+          {/* Timer Icon */}
+          <div className="w-20 h-20 lg:w-28 lg:h-28 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 lg:mb-6 border border-white/20">
+            <Timer className="w-10 h-10 lg:w-14 lg:h-14 text-teal-300" />
+          </div>
+          
+          <h1 className="text-2xl lg:text-4xl font-bold mb-1 lg:mb-2 bg-gradient-to-r from-white to-teal-200 bg-clip-text text-transparent">Rest Time</h1>
+          <p className="text-white/60 text-sm lg:text-base mb-5 lg:mb-8">Take a breather — next set starts soon.</p>
+
+          {/* Rest Timer - Large Display */}
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl lg:rounded-3xl p-6 lg:p-10 mb-4 lg:mb-6 border border-white/20">
+            <p className="text-5xl lg:text-7xl font-bold bg-gradient-to-r from-teal-400 to-emerald-400 bg-clip-text text-transparent mb-1 lg:mb-2">{restTimer}</p>
+            <p className="text-xs lg:text-sm text-white/60">seconds</p>
+          </div>
+
+          {/* Next Exercise Preview */}
+          <div className="bg-white/10 backdrop-blur-md rounded-xl lg:rounded-2xl p-4 lg:p-6 mb-5 lg:mb-8 border border-white/20">
+            <p className="text-teal-300 text-xs lg:text-sm mb-1 lg:mb-2">Up Next</p>
+            <p className="text-lg lg:text-2xl font-bold">
+              {currentSet < currentExercise.sets 
+                ? `${currentExercise.name} - Set ${currentSet + 1}` 
+                : currentExerciseIndex < workoutPlan.exercises.length - 1
+                ? workoutPlan.exercises[currentExerciseIndex + 1].name
+                : 'Workout Complete!'}
+            </p>
+          </div>
+
+          {/* Skip Rest Button - Same gradient as workout buttons */}
+          <button
+            onClick={handleSkipRest}
+            className="w-full max-w-md mx-auto py-3 lg:py-4 bg-gradient-to-r from-teal-500 to-emerald-400 hover:from-teal-600 hover:to-emerald-500 text-white font-bold rounded-xl lg:rounded-2xl shadow-lg shadow-teal-500/25 flex items-center justify-center gap-2 lg:gap-3 transition-all text-sm lg:text-base"
+          >
+            Skip Rest
+            <ChevronRight className="w-5 h-5 lg:w-6 lg:h-6" />
+          </button>
         </div>
 
-        {/* Rest Timer */}
-        <div className="bg-white bg-opacity-10 backdrop-blur-md rounded-3xl p-12 mb-8">
-          <p className="text-8xl font-bold mb-4">{restTimer}</p>
-          <p className="text-2xl text-blue-100">seconds</p>
+        {/* Progress indicator */}
+        <div className="mt-6">
+          <div className="w-full bg-white/20 rounded-full h-2">
+            <div 
+              className="bg-gradient-to-r from-teal-400 to-emerald-400 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${((currentExercise.rest - restTimer) / currentExercise.rest) * 100}%` }}
+            />
+          </div>
         </div>
-
-        {/* Next Exercise Preview */}
-        <div className="bg-white bg-opacity-10 backdrop-blur-md rounded-2xl p-6 mb-8">
-          <p className="text-blue-100 mb-2">Up Next</p>
-          <p className="text-2xl font-bold">
-            {currentSet < currentExercise.sets 
-              ? `${currentExercise.name} - Set ${currentSet + 1}` 
-              : currentExerciseIndex < workoutPlan.exercises.length - 1
-              ? workoutPlan.exercises[currentExerciseIndex + 1].name
-              : 'Workout Complete!'}
-          </p>
-        </div>
-
-        {/* Skip Rest Button */}
-        <button
-          onClick={handleSkipRest}
-          className="w-full max-w-md mx-auto py-5 bg-white text-blue-600 font-bold text-xl rounded-xl hover:bg-opacity-90 transition-all flex items-center justify-center gap-3"
-        >
-          Skip Rest
-          <ChevronRight className="w-6 h-6" />
-        </button>
       </div>
     </div>
   );
 
-  // Complete Screen
+  // Complete Screen - Teal/Green gradient theme (consistent with workout flow)
   const CompleteScreen = () => (
-    <div className="min-h-screen bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center p-6">
-      <div className="max-w-2xl w-full bg-white rounded-3xl shadow-2xl p-8 text-center">
-        <div className="w-32 h-32 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
-          <Trophy className="w-16 h-16 text-white" />
-        </div>
-        
-        <h1 className="text-5xl font-bold text-gray-800 mb-2">Amazing Work!</h1>
-        <p className="text-xl text-gray-600 mb-8">You crushed that workout! 💪</p>
-
-        {/* Workout Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className="bg-teal-50 rounded-xl p-6">
-            <Timer className="w-8 h-8 text-teal-600 mx-auto mb-2" />
-            <p className="text-3xl font-bold text-teal-600">{formatTime(timer)}</p>
-            <p className="text-sm text-gray-600">Duration</p>
-          </div>
-          <div className="bg-orange-50 rounded-xl p-6">
-            <Flame className="w-8 h-8 text-orange-600 mx-auto mb-2" />
-            <p className="text-3xl font-bold text-orange-600">{totalCaloriesBurned}</p>
-            <p className="text-sm text-gray-600">Calories</p>
-          </div>
-          <div className="bg-purple-50 rounded-xl p-6">
-            <Dumbbell className="w-8 h-8 text-purple-600 mx-auto mb-2" />
-            <p className="text-3xl font-bold text-purple-600">{workoutPlan.exercises.length}</p>
-            <p className="text-sm text-gray-600">Exercises</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-teal-900 to-slate-900 text-white">
+      {/* Glassy Header */}
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-teal-600/40 to-emerald-600/40 backdrop-blur-3xl" />
+        <div className="relative bg-white/10 backdrop-blur-xl border-b border-white/10">
+          <div className="max-w-4xl mx-auto px-4 lg:px-6 py-3 lg:py-4">
+            <div className="flex items-center justify-between">
+              <div className="w-10 lg:w-12" /> {/* Spacer */}
+              <div className="text-center bg-white/10 backdrop-blur-sm rounded-xl lg:rounded-2xl px-5 lg:px-8 py-2 lg:py-3">
+                <p className="text-teal-200 text-xs font-medium">Completed</p>
+                <p className="text-2xl lg:text-3xl font-bold text-white">{formatTime(timer)}</p>
+              </div>
+              <div className="w-10 lg:w-12" /> {/* Spacer */}
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Motivational Message */}
-        <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border-l-4 border-teal-500 rounded-lg p-6 mb-8">
-          <p className="text-lg text-gray-700">
-            "The only bad workout is the one that didn't happen. Great job showing up today!"
-          </p>
-        </div>
+      {/* Complete Content */}
+      <div className="max-w-4xl mx-auto p-4 lg:p-6">
+        <div className="bg-white/10 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/20 p-5 lg:p-8 text-center">
+          {/* Trophy Icon */}
+          <div className="w-20 h-20 lg:w-28 lg:h-28 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 lg:mb-6 shadow-xl shadow-orange-500/30">
+            <Trophy className="w-10 h-10 lg:w-14 lg:h-14 text-white" />
+          </div>
+          
+          <h1 className="text-2xl lg:text-4xl font-bold mb-1 lg:mb-2 bg-gradient-to-r from-white to-teal-200 bg-clip-text text-transparent">Amazing Work!</h1>
+          <p className="text-base lg:text-lg text-white/60 mb-5 lg:mb-8">You crushed that workout! 💪</p>
 
-        {/* Action Buttons */}
-        <div className="flex gap-4">
-          {onBack && (
+          {/* Workout Stats */}
+          <div className="grid grid-cols-3 gap-2 lg:gap-4 mb-5 lg:mb-8">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl lg:rounded-2xl p-3 lg:p-5 text-center border border-white/20">
+              <Timer className="w-5 h-5 lg:w-6 lg:h-6 text-teal-400 mx-auto mb-1 lg:mb-2" />
+              <p className="text-lg lg:text-2xl font-bold text-white">{formatTime(timer)}</p>
+              <p className="text-xs lg:text-sm text-white/60">Duration</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl lg:rounded-2xl p-3 lg:p-5 text-center border border-white/20">
+              <Flame className="w-5 h-5 lg:w-6 lg:h-6 text-orange-400 mx-auto mb-1 lg:mb-2" />
+              <p className="text-lg lg:text-2xl font-bold text-white">{totalCaloriesBurned}</p>
+              <p className="text-xs lg:text-sm text-white/60">Calories</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl lg:rounded-2xl p-3 lg:p-5 text-center border border-white/20">
+              <Dumbbell className="w-5 h-5 lg:w-6 lg:h-6 text-purple-400 mx-auto mb-1 lg:mb-2" />
+              <p className="text-lg lg:text-2xl font-bold text-white">{workoutPlan.exercises.length}</p>
+              <p className="text-xs lg:text-sm text-white/60">Exercises</p>
+            </div>
+          </div>
+
+          {/* Motivational Message */}
+          <div className="bg-white/10 backdrop-blur-sm border-l-4 border-teal-400 rounded-lg lg:rounded-xl p-4 lg:p-5 mb-5 lg:mb-8">
+            <p className="text-white/80 text-sm lg:text-base">
+              "The only bad workout is the one that didn't happen. Great job showing up today!"
+            </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 lg:gap-4">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="flex-1 py-3 lg:py-4 bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 text-white font-bold rounded-xl lg:rounded-2xl transition-all text-sm lg:text-base"
+              >
+                Back to Dashboard
+              </button>
+            )}
             <button
-              onClick={onBack}
-              className="flex-1 py-4 border-2 border-teal-500 text-teal-600 font-bold rounded-xl hover:bg-teal-50 transition-all"
+              onClick={() => {
+                setCurrentView('ready');
+                setCurrentExerciseIndex(0);
+                setCurrentSet(1);
+                setTimer(0);
+                timerStartRef.current = null;
+                setCompletedSets({});
+                setTotalCaloriesBurned(0);
+              }}
+              className="flex-1 py-3 lg:py-4 bg-gradient-to-r from-teal-500 to-emerald-400 hover:from-teal-600 hover:to-emerald-500 text-white font-bold rounded-xl lg:rounded-2xl shadow-lg shadow-teal-500/25 transition-all text-sm lg:text-base"
             >
-              Back to Dashboard
+              Start New Workout
             </button>
-          )}
-          <button
-            onClick={() => {
-              setCurrentView('ready');
-              setCurrentExerciseIndex(0);
-              setCurrentSet(1);
-              setTimer(0);
-              setCompletedSets({});
-              setTotalCaloriesBurned(0);
-            }}
-            className="flex-1 py-4 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white font-bold rounded-xl shadow-lg transition-all"
-          >
-            Start New Workout
-          </button>
+          </div>
         </div>
       </div>
     </div>

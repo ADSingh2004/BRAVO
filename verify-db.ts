@@ -45,7 +45,7 @@ async function verifyDatabaseIntegration() {
       'session_exercises',
       'completed_workouts',
       'exercise_logs',
-      'nutrition_logs',
+      'nutrient_logs',
       'body_measurements',
       'goals'
     ]
